@@ -1,0 +1,72 @@
+#/usr/bin/env python3
+import serial
+import time
+import pygame
+import random
+# settings
+path = "/home/plunter/test/"
+soundHappy= ["perfect.wav","perfect2.wav","perfect3.wav","perfect4.wav","perfect5.wav","perfect6.wav"]
+soundOk= ["idle1.wav","idle2.wav","idle3.wav","idle4.wav","idle5.wav","idle6.wav","idle7.wav","idle8.wav","idle9.wav"]
+soundSad= ["dry2.wav","dry3.wav","dry4.wav","dry5.wav","dry6.wav","dry7.wav","dry8.wav","dry9.wav"]
+time_between_barks = 15
+
+ser = serial.Serial('/dev/ttyACM0',9600,timeout=1.0)
+time.sleep(5)
+ser.reset_input_buffer()
+print("serial ok")
+
+pygame.mixer.init()
+
+
+
+# current state of plunter
+sound_file = soundHappy[random.randint(0,len(soundHappy)-1)]
+moisture = 0
+time_last_barked = 0
+
+#update our current state whenever we get new moisture data
+def handle_integer_data(value):
+    global moisture, sound_file
+    print("update moisture"+str(value))
+    moisture = value
+    if value < 350:
+        sound_file = soundHappy[random.randint(0,len(soundHappy)-1)] 
+    elif 350 <= value < 500:
+        sound_file = soundOk[random.randint(0,len(soundOk)-1)]
+    elif value > 500:
+        sound_file = soundSad[random.randint(0,len(soundSad)-1)]
+
+# play from the current state
+def handle_profanity():
+    print("motion?")
+    if (time.time() - time_last_barked) > time_between_barks:
+        bark()
+
+def bark():
+    global time_last_barked
+    time_last_barked = time.time()
+    print("bark - "+sound_file+" - time last: "+str(time_last_barked))
+    pygame.mixer.music.load(path + sound_file)
+    pygame.mixer.music.play()     
+    time.sleep(5)
+    while pygame.mixer.music.get_busy() == True:
+        continue
+
+while True:
+    data = ser.readline().decode('utf-8').strip()
+    print(data)
+    if data.startswith("M:"):
+        try:
+            value = int(data[2:])
+            handle_integer_data(value)
+        except ValueError:
+            print("invalid int")
+            
+    if data==("profanity"):
+    
+        handle_profanity()
+
+    if data == ("off"):
+        time.sleep(1)
+        ser.flushInput();
+        
